@@ -30,5 +30,7 @@ MANIFEST
 profile_default/
 ipython_config.py
 
+# Custom Folders
 data/*
 experiments/*
+.env
