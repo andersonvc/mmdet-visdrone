@@ -22,6 +22,12 @@ from mmdet.models import build_detector
 from mmdet.apis import train_detector
 
 from visdrone.datasets import VisDroneDataset
+from visdrone.baseline_configs import (
+    configure_fixtures,
+    configure_dataloader,
+    configure_scheduler,
+    configure_model,
+)
 
 
 logging.basicConfig(
@@ -40,9 +46,21 @@ args = parser.parse_args()
 
 logging.info("loading config file")
 try:
-    cfg = Config.fromfile(args.config_file)
+    # Build the entire experiment run config from composite files
+    dataloader = configure_dataloader()
+    fixtures = configure_fixtures(experiment_name="basic_cascade_rcnn_r50_1x")
+    scheduler = configure_scheduler(
+        optimizer_type="Adam", learning_rate=0.02, total_epochs=12
+    )
+    model = configure_model(model_name="CascadeRCNN")
+
+    cfg = Config()
+    cfg.merge_from_dict({**dataloader, **fixtures, **scheduler, **model})
+
 except Exception as e:
     logging.error(" ".join(["failed to load config_file:", args.config_file]))
+    print(e)
+
 cfg.work_dir = args.work_dir
 
 

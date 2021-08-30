@@ -44,7 +44,7 @@ if not DATASETS.get(custom_dataset):
 
             self.sample_filenames = [
                 v.split(".")[0] for v in os.listdir(self.img_prefix)
-            ][:100]
+            ]
             annotation_prefix = self.img_prefix.split("images")[0] + "/annotations"
             mmdet_annotations = []
             for i, image_id in enumerate(self.sample_filenames):
