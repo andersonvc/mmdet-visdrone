@@ -37,10 +37,8 @@ def init_mlflow_run(args):
     mlflow.set_tracking_uri(f'{os.getenv("MLFLOW_BASE_DIR")}')
 
     # Create experiment if it doesn't already exist
-    if (
-        mlflow.tracking.MlflowClient().get_experiment_by_name(args.experiment_name)
-        == None
-    ):
+    tmp_experiment_name = mlflow.tracking.MlflowClient().get_experiment_by_name(args.experiment_name)
+    if tmp_experiment_name==None:
         mlflow.create_experiment(args.experiment_name)
     mlflow.set_experiment(args.experiment_name)
 
