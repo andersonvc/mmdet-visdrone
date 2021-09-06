@@ -36,8 +36,12 @@ if not DATASETS.get(custom_dataset):
             "Others",
         )
 
-        def __init__(self, transform_dims=(1400, 788), **kwargs):
-            self.transform_dims = transform_dims
+        def __init__(self, **kwargs):
+            if "resize_dims" in kwargs:
+                self.resize_dims = kwargs.pop("resize_dims")
+            else:
+                self.resize_dims = (1400, 788)
+
             super().__init__(**kwargs, filter_empty_gt=True)
 
         def load_annotations(self, filepath):
@@ -58,8 +62,8 @@ if not DATASETS.get(custom_dataset):
 
                 ann = pd.read_csv(annotation_filename, header=None)
 
-                width_resize = self.transform_dims[0] / w
-                height_resize = self.transform_dims[1] / h
+                width_resize = self.resize_dims[0] / w
+                height_resize = self.resize_dims[1] / h
 
                 # Filter out occluded and truncated bounding boxes
                 # Filter out reshaped images smaller than 5 pixels wide or 5 pixels high
