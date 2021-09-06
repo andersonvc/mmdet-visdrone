@@ -24,11 +24,19 @@ train_pipeline = [
 
 test_pipeline = [
     {"type": "LoadImageFromFile"},
-    resize_image,
-    normalize_image,
-    pad_image,
-    {"type": "ImageToTensor", "keys": ["img"]},
-    {"type": "Collect", "keys": ["img"]},
+    {
+        "type": "MultiScaleFlipAug",
+        "img_scale": resize_dims,
+        "flip": False,
+        "transforms": [
+            resize_image,
+            {"type": "RandomFlip"},
+            normalize_image,
+            pad_image,
+            {"type": "ImageToTensor", "keys": ["img"]},
+            {"type": "Collect", "keys": ["img"]},
+        ],
+    },
 ]
 
 data = {
