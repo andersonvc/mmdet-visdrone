@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 import shutil
 import subprocess
+from functools import partial
 
 import mlflow
 import mmcv
@@ -22,6 +23,7 @@ from mmdetection.tools.deployment.pytorch2onnx import pytorch2onnx
 from visdrone.datasets import VisDroneDataset
 from visdrone.hooks import CustomMlflowLoggerHook, CustomTensorboardLoggerHook
 
+from hyperopt import fmin, tpe, hp, Trials
 
 mmcv_logger = mmcv.utils.logging.get_logger(
     __name__, log_file=None, log_level=logging.ERROR, file_mode="w"
@@ -43,15 +45,15 @@ def init_mlflow_run(args):
 
     # Create experiment if it doesn't already exist
     tmp_experiment_name = mlflow.tracking.MlflowClient().get_experiment_by_name(
-        args.experiment_name
+        args["experiment_name"]
     )
     if tmp_experiment_name == None:
-        mlflow.create_experiment(args.experiment_name)
-    mlflow.set_experiment(args.experiment_name)
+        mlflow.create_experiment(args["experiment_name"])
+    mlflow.set_experiment(args["experiment_name"])
 
     experiment_id = (
         mlflow.tracking.MlflowClient()
-        .get_experiment_by_name(args.experiment_name)
+        .get_experiment_by_name(args["experiment_name"])
         .experiment_id
     )
 
@@ -60,7 +62,7 @@ def init_mlflow_run(args):
 
     custom_config_entries = [
         f"{k}:{v}"
-        for k, v in vars(args).items()
+        for k, v in args.items()
         if k not in {"experiment_name", "config_file"}
     ]
     custom_run_name = "run_" + "_".join(custom_config_entries)
@@ -74,7 +76,7 @@ def init_mmdet_model(args):
     Builds the mmdetection configuration model used for training and inference
     """
 
-    cfg = Config.fromfile(f"{args.config_file}")
+    cfg = Config.fromfile(f"{args['config_file']}")
 
     # Override references to data dir
     for entry in [cfg.data.train, cfg.data.val, cfg.data.test]:
@@ -94,9 +96,7 @@ def update_custom_parameters(cfg, args):
     """
 
     custom_params = {
-        k: v
-        for k, v in vars(args).items()
-        if k not in {"experiment_name", "config_file"}
+        k: v for k, v in args.items() if k not in {"experiment_name", "config_file"}
     }
 
     def update_model(param_name, cfg_model_object):
@@ -136,13 +136,7 @@ def update_custom_parameters(cfg, args):
     return custom_run_name, custom_params
 
 
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="Train Custom Model")
-    parser.add_argument("--experiment_name")
-    parser.add_argument("--config_file")
-    parser.add_argument("--lr", default=0.02)
-    args = parser.parse_args()
+def train(args):
 
     # Initialize mmdet model and corresponding mlflow experiment/run
     mmdet_config = init_mmdet_model(args)
@@ -204,3 +198,34 @@ if __name__ == "__main__":
             )
         except Exception as e:
             logging.error(f"Failed to generate ONNX file: {e}")
+
+    # Return tracking metric -> mAP on Validation set
+    return (
+        -mlflow.tracking.MlflowClient().get_metric_history(run_id, "val_mAP")[-1].value
+    )
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Train Custom Model")
+    parser.add_argument("--experiment_name")
+    parser.add_argument("--config_file")
+    parser.add_argument("--lr", default=0.02)
+    args = vars(parser.parse_args())
+
+    trials = Trials()
+
+    hyperopt_space = {
+        "lr": hp.uniform("lr", 0.0005, 0.1),
+        "optim": hp.choice("optim", ["Adam", "SGD"]),
+    }
+
+    best = fmin(
+        fn=train,
+        space={**args, **hyperopt_space},
+        algo=tpe.suggest,
+        max_evals=50,
+        trials=trials,
+    )
+
+    logging.error(f"FINISHED TRIALS: {best}")

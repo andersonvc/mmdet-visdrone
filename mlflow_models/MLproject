@@ -1,0 +1,15 @@
+name: VisDrone Detection Project
+
+conda_env: environment.yaml
+
+entry_points:
+  main:
+    parameters:
+      experiment_name: {type: string, default: faster_rcnn_r50_fpn}
+      config_file: {type: string, default: configs/faster_rcnn_r50_fpn_1x2_1x_visdrone.py}
+      learning_rate: {type: float, default: 0.02}
+    command: |
+      python train.py \
+      --experiment_name {experiment_name} \
+      --config_file {config_file} \
+      --lr {learning_rate}
