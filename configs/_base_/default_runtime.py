@@ -3,7 +3,7 @@ log_level = "INFO"
 parameter_names = {"learning_rate", "momentum"}
 
 log_config = {
-    "interval": 50,
+    "interval": 20,
     "hooks": [
         {"type": "CustomMlflowLoggerHook", "parameters": parameter_names},
         {"type": "TensorboardLoggerHook"},

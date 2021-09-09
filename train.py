@@ -9,6 +9,7 @@ import argparse
 import logging
 from pathlib import Path
 import shutil
+import subprocess
 
 import mlflow
 import mmcv
@@ -16,13 +17,17 @@ from mmcv import Config
 from mmdet.datasets import build_dataset, build_dataloader
 from mmdet.models import build_detector
 from mmdet.apis import train_detector
+from mmdetection.tools.deployment.pytorch2onnx import pytorch2onnx
 
 from visdrone.datasets import VisDroneDataset
-from visdrone.hooks import CustomMlflowLoggerHook
+from visdrone.hooks import CustomMlflowLoggerHook, CustomTensorboardLoggerHook
 
 
+mmcv_logger = mmcv.utils.logging.get_logger(
+    __name__, log_file=None, log_level=logging.ERROR, file_mode="w"
+)
 logging.basicConfig(
-    format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG
+    format="%(asctime)s : %(levelname)s : %(message)s", level=logging.ERROR
 )
 
 
@@ -37,8 +42,10 @@ def init_mlflow_run(args):
     mlflow.set_tracking_uri(f'{os.getenv("MLFLOW_BASE_DIR")}')
 
     # Create experiment if it doesn't already exist
-    tmp_experiment_name = mlflow.tracking.MlflowClient().get_experiment_by_name(args.experiment_name)
-    if tmp_experiment_name==None:
+    tmp_experiment_name = mlflow.tracking.MlflowClient().get_experiment_by_name(
+        args.experiment_name
+    )
+    if tmp_experiment_name == None:
         mlflow.create_experiment(args.experiment_name)
     mlflow.set_experiment(args.experiment_name)
 
@@ -103,11 +110,26 @@ def update_custom_parameters(cfg, args):
     if cfg.model.type.lower() == "fasterrcnn":
         update_model("model", cfg.model.type)
         update_model("backbone", cfg.model.backbone.type)
+        if "neck" in cfg.model:
+            update_model("neck", cfg.model.neck.type)
+        else:
+            update_model("neck", "None")
         update_model("optim", cfg.optimizer.type)
         update_model("lr", cfg.optimizer.lr)
         update_model("momentum", cfg.optimizer.momentum)
-
         custom_run_name = f"FRCNN.{cfg.model.backbone.type}-{custom_params['optim']}-lr:{custom_params['lr']}-mom:{custom_params['momentum']}"
+    elif cfg.model.type.lower() == "cascadercnn":
+        update_model("model", cfg.model.type)
+        update_model("backbone", cfg.model.backbone.type)
+        if "neck" in cfg.model:
+            update_model("neck", cfg.model.neck.type)
+        else:
+            update_model("neck", "None")
+        update_model("optim", cfg.optimizer.type)
+        update_model("lr", cfg.optimizer.lr)
+        update_model("momentum", cfg.optimizer.momentum)
+        custom_run_name = f"CRCNN.{cfg.model.backbone.type}-{custom_params['optim']}-lr:{custom_params['lr']}-mom:{custom_params['momentum']}"
+
     else:
         raise Exception("Training script only configured for FasterRCNN models")
 
@@ -156,7 +178,29 @@ if __name__ == "__main__":
         with open(f"{artifact_path}/mmdet_model.py", "w+") as f:
             f.writelines(mmdet_config.pretty_text)
 
-        # Create work_dir
-        # mmcv.mkdir_or_exist(os.path.abspath(artifact_path))
+        # Train model
         logging.info("starting model training loop")
         train_detector(model, datasets, mmdet_config, distributed=False, validate=True)
+
+        # Generate onnx file for trained model
+        img_width, img_height = mmdet_config.resize_dims
+        try:
+            rc = subprocess.run(
+                [
+                    f"python",
+                    f"{os.getenv('BASE_DIR')}/mmdetection/tools/deployment/pytorch2onnx.py",
+                    f"{artifact_path}/mmdet_model.py",
+                    f"{artifact_path}/latest.pth",
+                    f"--output-file",
+                    f"{artifact_path}/model.onnx",
+                    f"--input-img",
+                    f"{os.getenv('BASE_DIR')}/sample.jpg",
+                    f"--shape",
+                    f"{img_width}",
+                    f"{img_height}",
+                ],
+                capture_output=True,
+                text=True,
+            )
+        except Exception as e:
+            logging.error(f"Failed to generate ONNX file: {e}")
