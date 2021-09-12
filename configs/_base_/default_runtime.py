@@ -1,13 +1,10 @@
-log_level = "INFO"
+log_level = "ERROR"
 
 parameter_names = {"learning_rate", "momentum"}
 
 log_config = {
-    "interval": 20,
-    "hooks": [
-        {"type": "CustomMlflowLoggerHook", "parameters": parameter_names},
-        {"type": "TensorboardLoggerHook"},
-    ],
+    "interval": 50,
+    "hooks": [{"type": "CustomMlflowLoggerHook", "parameters": parameter_names}],
 }
 evaluation = {"metric": "mAP", "interval": 1}
 checkpoint_config = {"interval": 1}

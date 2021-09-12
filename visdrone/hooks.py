@@ -2,7 +2,12 @@ import os
 from mmcv.utils import TORCH_VERSION, digit_version
 from mmcv.runner.dist_utils import master_only
 from mmcv.runner.hooks.hook import HOOKS
-from mmcv.runner.hooks.logger.base import LoggerHook
+from mmcv.runner.hooks.logger.base import LoggerHook, Hook
+
+from collections import deque
+
+import numpy as np
+import logging
 
 
 @HOOKS.register_module()
@@ -52,6 +57,7 @@ class CustomMlflowLoggerHook(LoggerHook):
         self.tags = tags
         self.log_model = log_model
         self.parameters = parameters
+        self.queue = deque([])
 
     def import_mlflow(self):
         try:
@@ -69,7 +75,6 @@ class CustomMlflowLoggerHook(LoggerHook):
             self.mlflow.set_experiment(self.exp_name)
         if self.tags is not None:
             self.mlflow.set_tags(self.tags)
-            print(self.get_loggable_tags(runner))
 
     @master_only
     def log(self, runner):
@@ -84,62 +89,27 @@ class CustomMlflowLoggerHook(LoggerHook):
         if tags:
             self.mlflow.log_metrics(tags, step=self.get_iter(runner))
 
+        if "train_acc" in tags:
+            acc_value = 0.0 if np.isnan(tags["train_acc"]) else tags["train_acc"]
+            if len(self.queue) < 6:
+                self.queue.appendleft(acc_value)
+            else:
+                self.queue.pop()
+                self.queue.appendleft(acc_value)
+                if all(x < 30.0 for x in self.queue):
+                    # Accuracy sucks; killing run
+                    raise Exception(
+                        "Training Accuracy is terrible: Intentionally killing this script"
+                    )
+
+        if "val_mAP" in tags:
+            map_value = 0.0 if np.isnan(tags["val_mAP"]) else tags["val_mAP"]
+            if map_value <= 0.0:
+                raise Exception(
+                    "Validation not improving: Intentionally killing this script"
+                )
+
     @master_only
     def after_run(self, runner):
         if self.log_model:
             self.mlflow_pytorch.log_model(runner.model, "models")
-
-
-
-@HOOKS.register_module()
-class CustomTensorboardLoggerHook(LoggerHook):
-
-    def __init__(self,
-                 log_dir=None,
-                 interval=10,
-                 ignore_last=True,
-                 reset_flag=False,
-                 by_epoch=True):
-        super(CustomTensorboardLoggerHook, self).__init__(interval, ignore_last,
-                                                    reset_flag, by_epoch)
-        self.log_dir = log_dir
-
-    @master_only
-    def before_run(self, runner):
-        super(CustomTensorboardLoggerHook, self).before_run(runner)
-        if (TORCH_VERSION == 'parrots'
-                or digit_version(TORCH_VERSION) < digit_version('1.1')):
-            try:
-                from tensorboardX import SummaryWriter
-            except ImportError:
-                raise ImportError('Please install tensorboardX to use '
-                                  'CustomTensorboardLoggerHook.')
-        else:
-            try:
-                from torch.utils.tensorboard import SummaryWriter
-            except ImportError:
-                raise ImportError(
-                    'Please run "pip install future tensorboard" to install '
-                    'the dependencies to use torch.utils.tensorboard '
-                    '(applicable to PyTorch 1.1 or higher)')
-
-        if self.log_dir is None:
-            self.log_dir = os.path.join(runner.work_dir, 'tf_logs')
-        self.writer = SummaryWriter(self.log_dir)
-
-    @master_only
-    def log(self, runner):
-        tags = self.get_loggable_tags(runner, allow_text=True)
-        for tag, val in tags.items():
-            if isinstance(val, str):
-                self.writer.add_text(tag, val, self.get_iter(runner))
-            else:
-                self.writer.add_scalar(tag, val, self.get_iter(runner))
-        raise Exception(next(iter(runner.data_loader)))
-        image_tensor = next(iter(runner.data_loader))._data
-        self.writer.add_graph(runner.model,image_tensor)
-
-
-    @master_only
-    def after_run(self, runner):
-        self.writer.close()
