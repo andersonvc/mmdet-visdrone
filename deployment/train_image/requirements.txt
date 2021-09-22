@@ -1,0 +1,9 @@
+torch
+torchvision
+python-dotenv 
+hyperopt
+mlflow
+opencv-python
+onnx
+mmcv-full
+mmdet

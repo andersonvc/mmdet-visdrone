@@ -99,15 +99,24 @@ class CustomMlflowLoggerHook(LoggerHook):
                 if all(x < 30.0 for x in self.queue):
                     # Accuracy sucks; killing run
                     raise Exception(
-                        "Training Accuracy is terrible: Intentionally killing this script"
+                        "Training Accuracy is terrible: Intentionally killing this script."
                     )
 
         if "val_mAP" in tags:
             map_value = 0.0 if np.isnan(tags["val_mAP"]) else tags["val_mAP"]
-            if map_value <= 0.0:
+            self.queue.appendleft(map_value)
+            
+            if map_value == 0.0 :
                 raise Exception(
-                    "Validation not improving: Intentionally killing this script"
+                    "Validation not improving: Intentionally killing this script."
                 )
+
+            if len(self.queue)>=3 and map_value<0.08:
+                raise Exception(
+                    "Validation not improving: Intentionally killing this script."
+                )
+
+            
 
     @master_only
     def after_run(self, runner):

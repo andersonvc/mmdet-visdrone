@@ -1,0 +1,18 @@
+services:
+  trainer:
+    build: train_image
+    depends_on:
+      - mlflow_server
+    env_file:
+      - train_image/local.env
+    volumes:
+      - ${BASE_DIR}/configs:/app/configs
+      - ${BASE_DIR}/visdrone:/app/visdrone
+      - ${MLFLOW_BASE_DIR}:/mlflow_data
+      - ${MLFLOW_DATA_DIR}:/data
+  mlflow_server:
+    build: mlflow_server_image
+    ports:
+      - 5000:5000
+    volumes:
+      - ${MLFLOW_BASE_DIR}:/data
