@@ -5,6 +5,7 @@ services:
       - mlflow_server
     env_file:
       - train_image/local.env
+    shm_size: 2gb
     volumes:
       - ${BASE_DIR}/configs:/app/configs
       - ${BASE_DIR}/visdrone:/app/visdrone

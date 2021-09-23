@@ -176,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=0.02)
     args = parser.parse_args()
 
-    #run_hyperopt_trial(args.experiment_name, args.config_file, train)
+    run_hyperopt_trial(args.experiment_name, args.config_file, train)
 
-    print('test dependencies load')
-    print(str(os.getenv("BASE_DIR")))
+    #print('test dependencies load')
+    #print(str(os.getenv("BASE_DIR")))

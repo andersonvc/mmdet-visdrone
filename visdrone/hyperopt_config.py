@@ -117,7 +117,7 @@ def parse_hyperopt_args(hyperopt_args):
     return cfg, custom_params, run_name
 
 
-def run_hyperopt_trial(experiment_name, config_file, train_fn, trial_cnt=50):
+def run_hyperopt_trial(experiment_name, config_file, train_fn, trial_cnt=2):
     """
     Retrains the visdrone model multiple times using different hyperparameters.
     Tree-structured Parzen Estimator (TPE) is used to search the parameter space.
@@ -135,6 +135,7 @@ def run_hyperopt_trial(experiment_name, config_file, train_fn, trial_cnt=50):
     trials = Trials()
 
     hyperopt_space = set_hyperopt_space()
+    print(config_file)
 
     best = fmin(
         fn=train_fn,
