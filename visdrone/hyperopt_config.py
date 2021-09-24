@@ -20,12 +20,12 @@ def set_hyperopt_space():
             [
                 {
                     "type": "SGD",
-                    "lr": hp.uniform("SGD-lr", 0.0001, 0.1),
-                    "momentum": hp.uniform("SGD-momentum", 0.0001, 0.9),
-                    "weight_decay": hp.uniform("SGD-weight_decay", 0.0001, 0.1),
+                    "lr": hp.uniform("SGD-lr", 0.0001, 0.03),
+                    "momentum": hp.uniform("SGD-momentum", 0.0, 0.3),
+                    "weight_decay": hp.uniform("SGD-weight_decay", 0.0, 0.025),
                     "nesterov": hp.choice("SGD-nesterov", (True, False)),
                 },
-                {"type": "Adam", "lr": hp.uniform("Adam-lr", 0.00001, 0.1)},
+                {"type": "Adam", "lr": hp.uniform("Adam-lr", 0.000001, 0.001)},
             ],
         )
     }
@@ -117,7 +117,7 @@ def parse_hyperopt_args(hyperopt_args):
     return cfg, custom_params, run_name
 
 
-def run_hyperopt_trial(experiment_name, config_file, train_fn, trial_cnt=2):
+def run_hyperopt_trial(experiment_name, config_file, train_fn, trial_cnt=100):
     """
     Retrains the visdrone model multiple times using different hyperparameters.
     Tree-structured Parzen Estimator (TPE) is used to search the parameter space.

@@ -139,8 +139,8 @@ def train(args):
             try:
                 rc = subprocess.run(
                     [
-                        f"python",
-                        f"{os.getenv('BASE_DIR')}/mmdetection/tools/deployment/pytorch2onnx.py",
+                        f"python3",
+                        f"/app/pytorch2onnx.py",
                         f"{artifact_path}/mmdet_model.py",
                         f"{artifact_path}/latest.pth",
                         f"--output-file",
@@ -177,6 +177,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run_hyperopt_trial(args.experiment_name, args.config_file, train)
-
-    #print('test dependencies load')
-    #print(str(os.getenv("BASE_DIR")))
