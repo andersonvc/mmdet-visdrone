@@ -7,7 +7,7 @@ services:
     env_file:
       - train_image/local.env
     environment:
-      - MLFLOW_DATABASE_URI:${MLFLOW_DATABASE_URI}
+      - MLFLOW_DATABASE_URI=${MLFLOW_DATABASE_URI}
     extra_hosts:
       - "host.docker.internal:172.17.0.1"
     shm_size: 2gb
@@ -35,6 +35,8 @@ services:
     build: mlflow_server_image
     depends_on:
       - mlflow_database
+    environment:
+      - MLFLOW_DATABASE_URI=${MLFLOW_DATABASE_URI}
     ports:
       - 5000:5000
     extra_hosts:

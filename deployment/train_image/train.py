@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import sys
 from dotenv import load_dotenv
 
@@ -105,6 +106,8 @@ def train(args):
 
         # Directory to store all metrics & model artifacts for run
         artifact_dir = f"/app/mlruns/{experiment_id}/{run_id}/artifacts"
+        logging.error(artifact_dir)
+        logging.error(os.getenv("MLFLOW_DATABASE_URI"))
 
         # Update model parameters and assign custom run name
         mmdet_config_update, custom_params, run_name = parse_hyperopt_args(args)
@@ -114,6 +117,8 @@ def train(args):
         mlflow.tracking.MlflowClient().set_tag(run_id, "mlflow.runName", run_name)
 
         with mlflow.start_run(experiment_id=experiment_id, run_id=run_id) as run:
+
+            mlflow.set_tag('mlflow.user','andersonvc')
 
             # Log custom parameters in mlflow dashboard
             for k, v in custom_params.items():
@@ -135,7 +140,8 @@ def train(args):
             model.CLASSES = VisDroneDataset.CLASSES
             model.init_weights()
 
-            with open(f"{artifact_dir}/mmdet_model.py", "w") as f:
+            Path(artifact_dir).mkdir(parents=True, exist_ok=True)
+            with open(f"{artifact_dir}/mmdet_model.py", "w+") as f:
                 f.writelines(mmdet_config.pretty_text)
 
             # Train model

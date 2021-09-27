@@ -11,7 +11,7 @@ WORKDIR /app
 EXPOSE 5000
 
 CMD mlflow server \
-    --backend-store-uri postgresql://mlflow:mlflow@host.docker.internal:5432/mlflow \
+    --backend-store-uri ${MLFLOW_DATABASE_URI} \
     --default-artifact-root ${BACKEND_STORE_URI} \
     --host 0.0.0.0 \
     --port ${MLFLOW_UI_PORT} \
