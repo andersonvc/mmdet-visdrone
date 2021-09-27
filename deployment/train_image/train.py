@@ -20,6 +20,10 @@ from mmdet.models import build_detector
 from mmdet.apis import train_detector
 from pytorch2onnx import pytorch2onnx
 
+from model_archiver.model_packaging import package_model
+from model_archiver.model_packaging_utils import ModelExportUtils
+from mmdet2torchserve import mmdet2torchserve
+
 from visdrone.datasets import VisDroneDataset
 from visdrone.hooks import CustomMlflowLoggerHook
 from visdrone.hyperopt_config import run_hyperopt_trial, parse_hyperopt_args
@@ -42,7 +46,7 @@ def init_mlflow_run(args):
     Output: (experiment_id, run_id)
     """
 
-    mlflow.set_tracking_uri(f'{os.getenv("MLFLOW_BASE_DIR")}')
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_DATABASE_URI"))
 
     # Create experiment if it doesn't already exist
     tmp_experiment_name = mlflow.tracking.MlflowClient().get_experiment_by_name(
@@ -90,10 +94,17 @@ def init_mmdet_model(args):
 
 def train(args):
 
+    experiment_name = args.get("experiment_name", "default-model")
+    create_onnx = args.get("create_onnx", False)
+    create_mar = args.get("create_mar", True)
+
     try:
         # Initialize mmdet model and corresponding mlflow experiment/run
         mmdet_config = init_mmdet_model(args)
         experiment_id, run_id = init_mlflow_run(args)
+
+        # Directory to store all metrics & model artifacts for run
+        artifact_dir = f"/app/mlruns/{experiment_id}/{run_id}/artifacts"
 
         # Update model parameters and assign custom run name
         mmdet_config_update, custom_params, run_name = parse_hyperopt_args(args)
@@ -112,11 +123,10 @@ def train(args):
             mmdet_config.work_dir = artifact_path
 
             # Build custom datasets -- resize_dims is needed as part of our bounding box filter logic
-            datasets = [
-                build_dataset(
-                    mmdet_config.data.train, {"resize_dims": mmdet_config.resize_dims}
-                ),
-            ]
+            train_dataset = build_dataset(
+                mmdet_config.data.train, {"resize_dims": mmdet_config.resize_dims}
+            )
+            datasets = [train_dataset]
 
             logging.info("generating model")
             model = build_detector(
@@ -125,7 +135,7 @@ def train(args):
             model.CLASSES = VisDroneDataset.CLASSES
             model.init_weights()
 
-            with open(f"{artifact_path}/mmdet_model.py", "w+") as f:
+            with open(f"{artifact_dir}/mmdet_model.py", "w") as f:
                 f.writelines(mmdet_config.pretty_text)
 
             # Train model
@@ -134,28 +144,42 @@ def train(args):
                 model, datasets, mmdet_config, distributed=False, validate=True
             )
 
-            # Generate onnx file for trained model
-            img_width, img_height = mmdet_config.resize_dims
-            try:
-                rc = subprocess.run(
-                    [
-                        f"python3",
-                        f"/app/pytorch2onnx.py",
-                        f"{artifact_path}/mmdet_model.py",
-                        f"{artifact_path}/latest.pth",
-                        f"--output-file",
-                        f"{artifact_path}/model.onnx",
-                        f"--input-img",
-                        f"{os.getenv('BASE_DIR')}/sample.jpg",
-                        f"--shape",
-                        f"{img_width}",
-                        f"{img_height}",
-                    ],
-                    capture_output=True,
-                    text=True,
-                )
-            except Exception as e:
-                logging.error(f"Failed to generate ONNX file: {e}")
+            if create_onnx == True:
+                # Generate onnx file for trained model
+                img_width, img_height = mmdet_config.resize_dims
+                try:
+                    rc = subprocess.run(
+                        [
+                            f"python3",
+                            f"/app/pytorch2onnx.py",
+                            f"{artifact_path}/mmdet_model.py",
+                            f"{artifact_path}/latest.pth",
+                            f"--output-file",
+                            f"{artifact_path}/model.onnx",
+                            f"--input-img",
+                            f"{os.getenv('BASE_DIR')}/sample.jpg",
+                            f"--shape",
+                            f"{img_width}",
+                            f"{img_height}",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                except Exception as e:
+                    logging.error(f"Failed to generate ONNX file: {e}")
+
+            if create_mar == True:
+                # Generate TorchServe model-archive file
+                try:
+                    mmdet2torchserve(
+                        config_file=f"{artifact_dir}/mmdet_model.py",
+                        checkpoint_file=f"{artifact_dir}/latest.pth",
+                        output_folder=artifact_dir,
+                        model_name=experiment_name,
+                        model_version=1,
+                    )
+                except Exception as e:
+                    logging.error(f"Failed to generate MAR file: {e}")
 
         # Return tracking metric -> mAP on Validation set
         return (

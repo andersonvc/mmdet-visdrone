@@ -5,5 +5,7 @@ hyperopt
 mlflow
 opencv-python
 onnx
+psycopg2-binary
+torch-model-archiver
 mmcv-full
 mmdet
