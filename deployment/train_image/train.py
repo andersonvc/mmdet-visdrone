@@ -106,8 +106,6 @@ def train(args):
 
         # Directory to store all metrics & model artifacts for run
         artifact_dir = f"/app/mlruns/{experiment_id}/{run_id}/artifacts"
-        logging.error(artifact_dir)
-        logging.error(os.getenv("MLFLOW_DATABASE_URI"))
 
         # Update model parameters and assign custom run name
         mmdet_config_update, custom_params, run_name = parse_hyperopt_args(args)
