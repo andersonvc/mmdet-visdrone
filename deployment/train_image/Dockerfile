@@ -24,6 +24,7 @@ WORKDIR /app
 COPY train.py /app
 COPY pytorch2onnx.py /app
 COPY mmdet2torchserve.py /app
+COPY mmdet_handler.py /app
 
 ENTRYPOINT echo GPU enabled: $(python3 -c "import torch; print(torch.cuda.is_available())") && \
     python3 /app/train.py --experiment_name FRCNN-VisDrone2 --config_file ${BASE_DIR}/configs/faster_rcnn_r50_fpn_1x2_1x_visdrone.py

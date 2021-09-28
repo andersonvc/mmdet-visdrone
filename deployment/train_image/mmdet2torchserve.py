@@ -18,7 +18,7 @@ def mmdet2torchserve(
     output_folder: str,
     model_name: str,
     model_version: str = "1.0",
-    force: bool = False,
+    force: bool = True,
 ):
     """Converts MMDetection model (config + checkpoint) to TorchServe `.mar`.
 
@@ -42,6 +42,7 @@ def mmdet2torchserve(
             If True, if there is an existing `{model_name}.mar`
             file under `output_folder` it will be overwritten.
     """
+
     mmcv.mkdir_or_exist(output_folder)
 
     config = mmcv.Config.fromfile(config_file)
